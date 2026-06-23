@@ -21,23 +21,35 @@ class FilesystemStorage:
 
     backend = "filesystem"
 
-    def __init__(self, data_root: str | Path | None = None, *, embed: bool = True) -> None:
+    def __init__(
+        self,
+        data_root: str | Path | None = None,
+        *,
+        embed: bool = True,
+        scope: Any = None,
+    ) -> None:
         self.data_root = Path(data_root) if data_root else Path(".agent-harness/local-index")
         self.embed = embed
+        self._scope = scope
 
     def settings_fragment(self) -> dict:
         return {"storage_backend": "filesystem", "data_root": str(self.data_root)}
 
-    def kb_dir(self, kb_id: str) -> Path:
+    def kb_dir(self, kb_id: str, scope: Any = None) -> Path:
         from agent_harness._engine import LOCAL_TENANT_ID
 
-        return self.data_root / "tenants" / LOCAL_TENANT_ID / "kbs" / kb_id
+        tenant_id = (
+            scope.resolved_tenant_id
+            if scope
+            else (self._scope.resolved_tenant_id if self._scope else LOCAL_TENANT_ID)
+        )
+        return self.data_root / "tenants" / tenant_id / "kbs" / kb_id
 
     def has_kb(self, kb_id: str) -> bool:
         """True if a local index for this KB already exists (so we can reuse, not rebuild)."""
         return self.kb_dir(kb_id).exists()
 
-    def session_scope(self):
+    def session_scope(self, scope: Any = None):
         from agent_harness._engine import isolated_db
 
         return isolated_db()

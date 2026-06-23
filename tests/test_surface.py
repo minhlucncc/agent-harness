@@ -61,13 +61,32 @@ def test_lightweight_embed_tier():
 
 
 @pytest.mark.parametrize(
-    "factory", ["worker", "docker", "cfworker", "remote", "http", "mezon", "queue"]
+    "factory", ["docker", "cfworker", "remote", "mezon", "queue"]
 )
 def test_unbuilt_providers_fail_loudly(factory):
+    """Still-stubbed providers raise NotImplementedError.
+
+    http and worker are now implemented and removed from this list.
+    """
     import agent_harness as h
 
     with pytest.raises(NotImplementedError, match="RFC 0024"):
         getattr(h, factory)()
+
+
+def test_built_providers_succeed():
+    """http() and worker() return real objects without raising.
+
+    These providers were spec'd and implemented in c0005 — they should
+    no longer raise NotImplementedError.
+    """
+    import agent_harness as h
+
+    ch = h.http()
+    assert ch is not None
+
+    w = h.worker()
+    assert w is not None
 
 
 def test_reuse_is_default_no_autobuild():
@@ -97,3 +116,16 @@ def test_storage_has_kb(tmp_path):
     assert st.has_kb("local-x") is False
     (tmp_path / "tenants" / LOCAL_TENANT_ID / "kbs" / "local-x").mkdir(parents=True)
     assert st.has_kb("local-x") is True
+
+
+def test_new_surface_exports():
+    """create_agent, create_runtime, and Scope are importable from agent_harness.
+
+    RED: these names are not yet exported — ImportError expected.
+    GREEN: after export, the assertions validate the surface contract.
+    """
+    from agent_harness import Scope, create_agent, create_runtime
+
+    assert create_agent is not None
+    assert create_runtime is not None
+    assert Scope is not None

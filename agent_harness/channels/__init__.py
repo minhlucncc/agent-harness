@@ -57,9 +57,30 @@ def cli(*, prompt: str = "you> ") -> CliChannel:
 
 
 # Other ingress — later rollout steps in RFC 0024.
-http = todo("channels.http()", "rollout step 5 — HTTP/SSE ingress")
+
+
+class HttpChannel:
+    """Minimal HTTP/1.0/JSON ingress using stdlib ``asyncio.start_server``."""
+
+    name = "http"
+
+    def __init__(self, host: str = "127.0.0.1", port: int = 8080) -> None:
+        self.host = host
+        self.port = port
+
+    async def serve(self, runtime: Any) -> None:
+        from agent_harness._engine import _serve_http
+
+        await _serve_http(self.host, self.port, runtime)
+
+
+def http(*, host: str = "127.0.0.1", port: int = 8080) -> HttpChannel:
+    """A minimal HTTP/1.0/JSON server — thin surface, zero external deps."""
+    return HttpChannel(host=host, port=port)
+
+
 mezon = todo("channels.mezon()", "rollout step 4 — Python Mezon WS channel")
 queue = todo("channels.queue()", "rollout step 6 — arq consumer (prod)")
 cron = todo("channels.cron()", "rollout step — scheduler tick")
 
-__all__ = ["CliChannel", "cli", "http", "mezon", "queue", "cron"]
+__all__ = ["CliChannel", "cli", "HttpChannel", "http", "mezon", "queue", "cron"]

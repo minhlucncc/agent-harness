@@ -2,7 +2,8 @@
 
 The Runtime is the *harness* (an agent bound to a Sandbox + Storage + Cache), internalized. It
 owns the single new glue over the engine — `dispatch` → `run_turn` — and calls it from each
-channel. `agent.serve()` / `agent.runtime()` build it.
+channel. ``create_runtime()`` is the recommended factory; ``agent.serve()`` / ``agent.runtime()``
+delegate to it.
 """
 
 from __future__ import annotations
@@ -10,7 +11,66 @@ from __future__ import annotations
 import asyncio
 from typing import Any, Awaitable, Callable
 
+from agent_harness._scope import Scope
+
 ReplySink = Callable[[Any, Any], Awaitable[None]]
+
+
+def create_runtime(
+    agent: Any,
+    *,
+    sandbox: Any = None,
+    channels: Any = None,
+    storage: Any = None,
+    cache: Any = None,
+    client: Any = None,
+    build: str = "reuse",
+    scope: Scope | None = None,
+    session_id: str | None = None,
+) -> Runtime:
+    """Bind an Agent to infrastructure and return a Runtime.
+
+    Parameters
+    ----------
+    agent : Agent
+        The bot definition to bind.
+    sandbox
+        **Required.** Execution environment (e.g. ``local()``).
+    channels
+        Ingress channels (e.g. ``[cli()]``). Defaults to ``[]``.
+    storage
+        Persistence backend. Defaults to the sandbox's default.
+    cache
+        Session cache. Defaults to the sandbox's default.
+    client
+        Optional prebuilt ``(client, model)`` pair.
+    build
+        KB build policy: ``"reuse"`` (default), ``"missing"``, or ``"always"``.
+    scope
+        Explicit ``Scope`` for isolation. Generated if neither ``scope`` nor
+        ``session_id`` is given.
+    session_id
+        String session ID. Shorthand for ``Scope(session_id=…)`` when no
+        explicit ``scope`` is provided.
+    """
+    if sandbox is None:
+        raise TypeError("sandbox is required")
+    if build not in ("reuse", "missing", "always"):
+        raise ValueError(f"build must be one of 'reuse', 'missing', or 'always', got {build!r}")
+    if scope is None and session_id is not None:
+        scope = Scope(session_id=session_id)
+    elif scope is None:
+        scope = Scope.generate()
+    return Runtime(
+        agent,
+        sandbox=sandbox,
+        channels=channels or [],
+        storage=storage,
+        cache=cache,
+        client=client,
+        build=build,
+        scope=scope,
+    )
 
 
 class Runtime:
@@ -24,10 +84,12 @@ class Runtime:
         cache: Any = None,
         client: tuple[Any, str] | None = None,
         build: str = "reuse",
+        scope: Scope | None = None,
     ) -> None:
         self.agent = agent
         self.sandbox = sandbox
         self.channels = channels
+        self.scope = scope if scope is not None else Scope.generate()
         # KB build policy: "reuse" (default — never build; reuse an existing index, error if
         # missing), "missing" (build only if absent), "always" (force rebuild). Indexing is a
         # separate, explicit step (`mez index`); benching/serving must NOT silently re-embed.
@@ -95,6 +157,7 @@ class Runtime:
     def _ensure_client(self) -> tuple[Any, str]:
         if self._client is None:
             self._client, self._model = self.sandbox.client()
+        assert self._model is not None
         return self._client, self._model
 
     # ── the one dispatch seam ──────────────────────────────────────────────────

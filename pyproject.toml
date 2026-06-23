@@ -30,6 +30,7 @@ Source = "https://github.com/minhlucncc/agent-harness"
 
 [project.optional-dependencies]
 engine = ["agent-core", "rag-core", "arag-core", "worker-ingest"]
+redis = ["redis>=5.0.0"]
 dev = ["pytest>=8.0.0", "pytest-asyncio>=0.23.0"]
 
 [build-system]

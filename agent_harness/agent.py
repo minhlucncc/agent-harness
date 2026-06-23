@@ -25,6 +25,38 @@ def _load_policy(config: str | dict | Path) -> dict:
     return dict(policy)
 
 
+def create_agent(
+    config: str | dict | Path,
+    *,
+    kb: dict[str, str] | None = None,
+    tools: Any = (),
+    skills: Any = (),
+    plugins: Any = None,
+    instructions: str | None = None,
+    model: str | None = None,
+    **overrides: Any,
+) -> Agent:
+    """Create an Agent with an optional ``model`` convenience parameter.
+
+    Validates that ``config`` is not None, then delegates to ``Agent(config, …)``.
+    If ``model`` is provided it is set on the policy — equivalent to passing
+    ``model=`` in ``**overrides``.
+    """
+    if config is None:
+        raise TypeError("config is required")
+    if model is not None:
+        overrides.setdefault("model", model)
+    return Agent(
+        config,
+        kb=kb,
+        tools=tools,
+        skills=skills,
+        plugins=plugins,
+        instructions=instructions,
+        **overrides,
+    )
+
+
 class Agent:
     """A bot definition. Construct with the policy + building blocks; `.serve()` to run.
 
@@ -60,7 +92,7 @@ class Agent:
         for key, value in overrides.items():
             self.policy[key] = value
 
-    # ── run ──────────────────────────────────────────────────────────────────
+    # ── backward-compat shims ────────────────────────────────────────────────
     def runtime(
         self,
         *,
@@ -72,13 +104,16 @@ class Agent:
     ) -> Any:
         """Build (but don't start) the Runtime that binds this agent to infra + channels.
 
+        Delegates to ``create_runtime()`` internally and auto-generates a Scope so each
+        call produces an isolated Runtime instance.
+
         `build` defaults to "reuse" — the KB index is never auto-built; indexing is a separate
         step (`mez index`). Use "missing" to build once if absent, "always" to force a rebuild."""
         from agent_harness.channels import cli
-        from agent_harness.runtime import Runtime
+        from agent_harness.runtime import create_runtime
         from agent_harness.sandbox import local
 
-        return Runtime(
+        return create_runtime(
             self,
             sandbox=sandbox or local(),
             channels=list(channels) if channels else [cli()],
@@ -117,13 +152,16 @@ class Agent:
     ) -> tuple[Any, Any]:
         """Run ONE turn (no channel) → (result, host). The local loop + benchmarks build on this.
 
+        Delegates to ``create_runtime()`` internally and auto-generates a Scope so each
+        call produces an isolated Runtime instance.
+
         Reuse one Agent across many `run(...)` calls (e.g. a benchmark) by holding the Runtime via
         `agent.runtime(...)` and calling `.run_once(...)` — the KB + client are then built once.
         `build` defaults to "reuse": the index is never auto-built (indexing is `mez index`)."""
-        from agent_harness.runtime import Runtime
+        from agent_harness.runtime import create_runtime
         from agent_harness.sandbox import local
 
-        rt = Runtime(
+        rt = create_runtime(
             self,
             sandbox=sandbox or local(),
             channels=[],

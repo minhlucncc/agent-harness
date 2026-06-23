@@ -7,6 +7,7 @@ stubs for later rollout steps.
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 from agent_harness._stub import todo
@@ -63,9 +64,59 @@ def local(*, embed: bool = True) -> LocalSandbox:
 
 
 # Other environments — later rollout steps in RFC 0024.
-worker = todo("sandbox.worker()", "rollout step 6 — production parity")
+
+
+class WorkerSandbox:
+    """A worker-process sandbox — Redis-backed cache, filesystem storage.
+
+    ``embed`` controls the default KB tier: ``True`` = full embeddings,
+    ``False`` = raw structural chunks (no embedding model).
+    """
+
+    name = "worker"
+
+    def __init__(self, *, embed: bool = True, data_root: str | Path | None = None) -> None:
+        self.embed = embed
+        self.data_root = data_root
+
+    def default_storage(self) -> Any:
+        from agent_harness.storage import filesystem
+
+        return filesystem(data_root=self.data_root, embed=self.embed)
+
+    def default_cache(self) -> Any:
+        from agent_harness.cache import redis
+
+        return redis()
+
+    def client(self) -> tuple[Any, str]:
+        from agent_harness._engine import build_client
+
+        return build_client()
+
+    def job_settings(
+        self, conversation_id: str, agent: Any, storage: Any, model: str
+    ) -> tuple[Any, dict]:
+        """The per-turn JobContext + settings."""
+        from agent_harness._engine import build_job
+
+        job = build_job(conversation_id)
+        settings = {
+            "model": model,
+            "bot_id": "worker",
+            "skills": agent.skills,
+            **storage.settings_fragment(),
+        }
+        return job, settings
+
+
+def worker(*, embed: bool = True, data_root: str | Path | None = None) -> WorkerSandbox:
+    """A worker-process sandbox — Redis cache + filesystem storage (production parity)."""
+    return WorkerSandbox(embed=embed, data_root=data_root)
+
+
 docker = todo("sandbox.docker()", "rollout step 5 — one-box self-host")
 cfworker = todo("sandbox.cfworker()", "rollout step 7 — edge/serverless spike")
 remote = todo("sandbox.remote()", "rollout step 7 — provider container")
 
-__all__ = ["LocalSandbox", "local", "worker", "docker", "cfworker", "remote"]
+__all__ = ["LocalSandbox", "local", "WorkerSandbox", "worker", "docker", "cfworker", "remote"]

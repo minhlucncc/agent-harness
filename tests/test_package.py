@@ -52,6 +52,10 @@ def test_import_agent_harness() -> None:
     for name in ("inproc", "redis"):
         assert hasattr(h, name), f"{name} not exposed"
 
+    # Factory API + Scope (c0005)
+    for name in ("Scope", "create_agent", "create_runtime", "Runtime"):
+        assert hasattr(h, name), f"{name} not exposed"
+
 
 def test_no_dangling_legacy_import_path() -> None:
     """No source file under packages/agent-harness references the legacy name.
@@ -101,9 +105,9 @@ def test_engine_missing_mentions_engine_extra() -> None:
         )
 
     # Fallback: inspect the error-message string in _engine.py source
-    import agent_harness  # noqa: F811
+    from agent_harness import _engine as agent_harness_engine_mod
 
-    eng_path = Path(agent_harness._engine.__file__)  # noqa: F811
+    eng_path = Path(agent_harness_engine_mod.__file__)
     src = eng_path.read_text(encoding="utf-8")
     # Find the pip-install hint line
     for line in src.splitlines():
@@ -121,7 +125,8 @@ def test_thin_import_constructs_agent_without_engine() -> None:
 
     After ``import agent_harness; Agent(...)``, none of ``agent_core``,
     ``rag_core``, ``arag_core``, or ``worker_ingest`` should be in
-    ``sys.modules``.
+    ``sys.modules``. Additionally, importing ``http`` (stdlib-backed) and
+    ``redis`` (lazy-import) must not trigger engine loading.
     """
     # Clear any pre-loaded engine modules that might have leaked from other tests
     for mod in ("agent_core", "rag_core", "arag_core", "worker_ingest"):
@@ -135,6 +140,26 @@ def test_thin_import_constructs_agent_without_engine() -> None:
     for mod in ("agent_core", "rag_core", "arag_core", "worker_ingest"):
         assert mod not in sys.modules, (
             f"engine module {mod} is loaded after thin Agent construction"
+        )
+
+    # HTTP channel uses stdlib only — must not trigger engine loading
+    from agent_harness.channels import http
+
+    ch = http()
+    assert ch is not None
+    for mod in ("agent_core", "rag_core", "arag_core", "worker_ingest"):
+        assert mod not in sys.modules, (
+            f"engine module {mod} is loaded after http() import"
+        )
+
+    # Redis cache uses lazy import — importing the factory must not trigger engine loading
+    from agent_harness.cache import redis
+
+    c = redis()
+    assert c is not None
+    for mod in ("agent_core", "rag_core", "arag_core", "worker_ingest"):
+        assert mod not in sys.modules, (
+            f"engine module {mod} is loaded after redis() import"
         )
 
 

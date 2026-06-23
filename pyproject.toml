@@ -1,0 +1,51 @@
+[project]
+name = "agent-harness"
+version = "0.1.0"
+description = "Bot Harness — run any Mezon bot on any environment (RFC 0024)."
+requires-python = ">=3.12"
+# The thin surface (Agent, sandbox/channel factories) imports only the stdlib so the
+# package stays installable on its own. The engine packages are pulled by the [engine]
+# extra and imported lazily inside dispatch — mirroring mezctl's [local] extra.
+dependencies = []
+authors = [
+    {name = "minhlucncc", email = "minhlucncc@users.noreply.github.com"},
+]
+license = {text = "MIT"}
+readme = "README.md"
+keywords = ["bot", "harness", "agent", "mezon"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+
+[project.urls]
+Homepage = "https://github.com/minhlucncc/agent-harness"
+Source = "https://github.com/minhlucncc/agent-harness"
+"RFC 0024" = "https://github.com/minhlucncc/platform/blob/main/docs/design/0024-bot-harness.md"
+
+[project.optional-dependencies]
+engine = ["agent-core", "rag-core", "arag-core", "worker-ingest"]
+dev = ["pytest>=8.0.0", "pytest-asyncio>=0.23.0"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["agent_harness"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.format]
+quote-style = "double"
